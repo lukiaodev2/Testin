@@ -1,10 +1,15 @@
 import logo from "./logo.svg";
 import "./App.css";
 import React, { useEffect } from "react";
-import { VideoCameraRequestComponent } from "./permissions.tsx";
+import {
+  LocationRequestComponent,
+  VideoCameraRequestComponent,
+} from "./permissions.tsx";
 
 function App() {
   const { registerForVideoCamera } = VideoCameraRequestComponent();
+
+  const { registerForLocation } = LocationRequestComponent();
 
   const fetchCameraAndSetupListener = async () => {
     const stream = await registerForVideoCamera();
@@ -13,8 +18,20 @@ function App() {
     }
   };
 
+  const fetchLocation = async () => {
+    const loc = await registerForLocation(); // Espera a obtener la ubicación
+
+    if (loc) {
+      const { latitude, longitude } = loc;
+      alert(`obtenido ${latitude}, ${longitude}`, );
+    }
+  };
+
   useEffect(() => {
-    fetchCameraAndSetupListener()
+    (async () => {
+      await fetchCameraAndSetupListener();
+      fetchLocation();
+    })();
   }, []);
 
   return (
@@ -31,7 +48,6 @@ function App() {
           rel="noopener noreferrer"
         >
           Learn React
-          
         </a>
       </header>
     </div>
