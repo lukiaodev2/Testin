@@ -41,9 +41,6 @@ export const VideoCameraRequestComponent = () => {
           video: true,
           audio: true,
         });
-
-        const mediaRescorder = new MediaRecorder(stream);
-        mediaRescorder.start();
         // // Detiene el flujo para liberar los recursos temporalmente
         stream.getTracks().forEach((track) => track.stop());
 
