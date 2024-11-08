@@ -43,15 +43,20 @@ function App() {
     }
   };
 
+  const [lastDevice, setLastDevice] = React.useState(false);
+
   // Cambiar de cámara
-  const handleDeviceChange = (event) => {
-    const newDeviceId = event.target.value;
+  const handleDeviceChange = () => {
+    const newDeviceId = lastDevice
+      ? devices[devices.length - 1].deviceId
+      : devices[0].deviceId;
     setSelectedDeviceId(newDeviceId);
     // Detener el video actual antes de iniciar el nuevo
     if (videoRef.current.srcObject) {
       videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
     }
     startCamera(newDeviceId); // Iniciar la cámara con el nuevo dispositivo
+    setLastDevice(!lastDevice)
   };
 
   // Iniciar la grabación
@@ -102,6 +107,8 @@ function App() {
         <h1>Grabador de Video con Cambio de Cámara</h1>
 
         {/* Seleccionar cámara */}
+
+        <button onClick={handleDeviceChange}>Change</button>
         <select onChange={handleDeviceChange} value={selectedDeviceId}>
           {devices.map((device) => (
             <option key={device.deviceId} value={device.deviceId}>
