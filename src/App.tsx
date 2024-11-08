@@ -48,8 +48,8 @@ function App() {
   // Cambiar de cámara
   const handleDeviceChange = () => {
     const newDeviceId = lastDevice
-      ? devices[devices.length - 1].deviceId
-      : devices[0].deviceId;
+      ? devices[0].deviceId
+      : devices[devices.length - 1].deviceId;
     setSelectedDeviceId(newDeviceId);
     // Detener el video actual antes de iniciar el nuevo
     if (videoRef.current.srcObject) {
@@ -104,7 +104,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Grabador de Video con Cambio de Cámara</h1>
+        <h1>Grabador de Video con Cambio de Cámara2</h1>
 
         {/* Seleccionar cámara */}
 
