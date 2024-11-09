@@ -1,139 +1,112 @@
 import "./App.css";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 function App() {
-  const [recording, setRecording] = React.useState<any>(false);
-  const [videoBlob, setVideoBlob] = React.useState<any>(null);
-  const [videoURL, setVideoURL] = React.useState<any>(null);
-  const [devices, setDevices] = React.useState<any>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = React.useState<any>(null);
-  const videoRef = React.useRef<any>(null);
-  const mediaRecorderRef = React.useRef<any>(null);
-  const chunksRef = React.useRef<any>([]);
-  const [stream, setStream] = React.useState<any>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+  const [currentDeviceIndex, setCurrentDeviceIndex] = useState(0);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
+    null
+  );
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const recordedChunks: Blob[] = [];
 
-  // Enumerar dispositivos de video disponibles
-  React.useEffect(() => {
-    const getDevices = async () => {
-      const allDevices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = allDevices.filter(
+  // Obtener dispositivos de cámara
+  useEffect(() => {
+    const getVideoDevices = async () => {
+      const devicesList = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devicesList.filter(
         (device) => device.kind === "videoinput"
       );
       setDevices(videoDevices);
-      // Seleccionar el primer dispositivo por defecto
-      if (videoDevices[0]) {
-        setSelectedDeviceId(videoDevices[0].deviceId);
-        startCamera(videoDevices[0].deviceId);
+      if (videoDevices.length > 0) {
+        startStream(videoDevices[0].deviceId);
       }
     };
-    getDevices();
+    getVideoDevices();
   }, []);
 
-  // Iniciar la cámara y el micrófono con el dispositivo seleccionado
-  const startCamera = async (deviceId) => {
-    try {
-      const streamTemp = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: deviceId || selectedDeviceId },
+  // Iniciar el stream de la cámara
+  const startStream = async (deviceId: string) => {
+    if (videoRef.current) {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId },
         audio: true,
       });
-      setStream(streamTemp);
-      videoRef.current.srcObject = streamTemp;
-    } catch (error) {
-      console.error("Error accediendo a la cámara o micrófono:", error);
+      videoRef.current.srcObject = stream;
     }
   };
 
-  const [lastDevice, setLastDevice] = React.useState(false);
-
-  // Cambiar de cámara
-  const handleDeviceChange = () => {
-    const newDeviceId = lastDevice
-      ? devices[0].deviceId
-      : devices[devices.length - 1].deviceId;
-    setSelectedDeviceId(newDeviceId);
-    // Detener el video actual antes de iniciar el nuevo
-    if (videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+  // Cambiar entre dispositivos de cámara
+  const switchCamera = () => {
+    const newIndex = currentDeviceIndex === 0 ? devices.length - 1 : 0;
+    setCurrentDeviceIndex(newIndex);
+    if (devices[newIndex]) {
+      startStream(devices[newIndex].deviceId);
     }
-    startCamera(newDeviceId); // Iniciar la cámara con el nuevo dispositivo
-    setLastDevice(!lastDevice)
   };
 
   // Iniciar la grabación
-  const startRecording = async () => {
-    if (stream) {
-      setRecording(true);
-      chunksRef.current = [];
-      mediaRecorderRef.current = new MediaRecorder(stream, {
-        mimeType: "video/webm",
-      });
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) chunksRef.current.push(event.data);
+  const startRecording = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      const recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recordedChunks.push(event.data);
       };
-
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "video/webm" });
-        setVideoBlob(blob);
-        setVideoURL(URL.createObjectURL(blob));
-        chunksRef.current = [];
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: "video/webm" });
+        setRecordingUrl(URL.createObjectURL(blob));
       };
-      mediaRecorderRef.current.start();
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
     }
   };
 
   // Detener la grabación
   const stopRecording = () => {
-    setRecording(false);
-    mediaRecorderRef.current.stop();
-  };
-
-  // Descargar el video grabado
-  const downloadVideo = () => {
-    if (videoBlob) {
-      const url = URL.createObjectURL(videoBlob);
-      const a = document.createElement("a");
-      a.style.display = "none";
-      a.href = url;
-      a.download = "grabacion_con_audio.webm";
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
+    if (mediaRecorder) {
+      mediaRecorder.stop();
+      setIsRecording(false);
     }
   };
+
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Grabador de Video con Cambio de Cámara2</h1>
-
-        {/* Seleccionar cámara */}
-
-        <button onClick={handleDeviceChange}>Change</button>
-        <select onChange={handleDeviceChange} value={selectedDeviceId}>
-          {devices.map((device) => (
-            <option key={device.deviceId} value={device.deviceId}>
-              {device.label || `Cámara ${device.deviceId}`}
-            </option>
-          ))}
-        </select>
-
-        {/* Vista previa de video */}
-        <video ref={videoRef} autoPlay playsInline muted></video>
-
-        {/* Botones de grabación */}
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          style={{ width: "50%" }}
+        />
         <div>
-          {!recording ? (
-            <button onClick={startRecording}>Iniciar Grabación</button>
-          ) : (
-            <button onClick={stopRecording}>Detener Grabación</button>
-          )}
+          <button onClick={startRecording} disabled={isRecording}>
+            Iniciar grabación
+          </button>
+          <button onClick={switchCamera} disabled={!isRecording}>
+            Cambiar cámara
+          </button>
+          <button onClick={stopRecording} disabled={!isRecording}>
+            Detener grabación
+          </button>
         </div>
+        {recordingUrl && (
+          <div>
+            <h3>URL de la grabación:</h3>
+            <a href={recordingUrl} download="grabacion.webm">
+              Descargar grabación
+            </a>
+          </div>
+        )}
 
         {/* Descargar video */}
-        {videoBlob && (
+        {recordingUrl && (
           <div>
-            <video src={videoURL} controls></video>
-            <button onClick={downloadVideo}>Descargar Video</button>
+            <video src={recordingUrl} controls></video>
           </div>
         )}
       </header>
