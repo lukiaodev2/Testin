@@ -20,7 +20,9 @@ function App() {
         (device) => device.kind === "videoinput"
       );
       setDevices(videoDevices);
-      alert(`${videoDevices.length}, esto-->,${videoDevices.length - 1}`);
+      alert(`${JSON.stringify(videoDevices)}, esto-->,${videoDevices.length - 1}`);
+      console.log(`${JSON.stringify(videoDevices)}, esto-->,${videoDevices.length - 1}`);
+
       if (videoDevices.length > 0) {
         startStream(videoDevices[0].deviceId);
       }
