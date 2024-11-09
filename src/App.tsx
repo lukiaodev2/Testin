@@ -1,116 +1,66 @@
 import "./App.css";
 import React, { useEffect, useRef, useState } from "react";
+import Webcam from "react-webcam";
 
 function App() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
-  const [currentDeviceIndex, setCurrentDeviceIndex] = useState(0);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
-    null
-  );
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const recordedChunks: Blob[] = [];
+  const webcamRef = React.useRef(null);
+  const mediaRecorderRef = React.useRef(null);
+  const [capturing, setCapturing] = React.useState(false);
+  const [recordedChunks, setRecordedChunks] = React.useState([]);
 
-  // Obtener dispositivos de cámara
-  useEffect(() => {
-    const getVideoDevices = async () => {
-      const devicesList = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devicesList.filter(
-        (device) => device.kind === "videoinput"
-      );
-      setDevices(videoDevices);
-      alert(`${JSON.stringify(videoDevices)}, esto-->,${videoDevices.length - 1}`);
-      console.log(`${JSON.stringify(videoDevices)}, esto-->,${videoDevices.length - 1}`);
+  const handleStartCaptureClick = React.useCallback(() => {
+    setCapturing(true);
+    mediaRecorderRef.current = new MediaRecorder(webcamRef.current.stream, {
+      mimeType: "video/webm",
+    });
+    mediaRecorderRef.current.addEventListener(
+      "dataavailable",
+      handleDataAvailable
+    );
+    mediaRecorderRef.current.start();
+  }, [webcamRef, setCapturing, mediaRecorderRef]);
 
-      if (videoDevices.length > 0) {
-        startStream(videoDevices[0].deviceId);
+  const handleDataAvailable = React.useCallback(
+    ({ data }) => {
+      if (data.size > 0) {
+        setRecordedChunks((prev) => prev.concat(data));
       }
-    };
-    getVideoDevices();
-  }, []);
+    },
+    [setRecordedChunks]
+  );
 
-  // Iniciar el stream de la cámara
-  const startStream = async (deviceId: string) => {
-    if (videoRef.current) {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId },
-        audio: true,
+  const handleStopCaptureClick = React.useCallback(() => {
+    mediaRecorderRef.current.stop();
+    setCapturing(false);
+  }, [mediaRecorderRef, webcamRef, setCapturing]);
+
+  const handleDownload = React.useCallback(() => {
+    if (recordedChunks.length) {
+      const blob = new Blob(recordedChunks, {
+        type: "video/webm",
       });
-      videoRef.current.srcObject = stream;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      document.body.appendChild(a);
+      a.style = "display: none";
+      a.href = url;
+      a.download = "react-webcam-stream-capture.webm";
+      a.click();
+      window.URL.revokeObjectURL(url);
+      setRecordedChunks([]);
     }
-  };
-
-  // Cambiar entre dispositivos de cámara
-  const switchCamera = () => {
-    const newIndex = currentDeviceIndex === 0 ? devices.length - 1 : 0;
-    setCurrentDeviceIndex(newIndex);
-    if (devices[newIndex]) {
-      startStream(devices[newIndex].deviceId);
-    }
-  };
-
-  // Iniciar la grabación
-  const startRecording = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      const recorder = new MediaRecorder(stream);
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) recordedChunks.push(event.data);
-      };
-      recorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: "video/webm" });
-        setRecordingUrl(URL.createObjectURL(blob));
-      };
-      recorder.start();
-      setMediaRecorder(recorder);
-      setIsRecording(true);
-    }
-  };
-
-  // Detener la grabación
-  const stopRecording = () => {
-    if (mediaRecorder) {
-      mediaRecorder.stop();
-      setIsRecording(false);
-    }
-  };
-
+  }, [recordedChunks]);
   return (
     <div className="App">
       <header className="App-header">
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          style={{ width: "50%" }}
-        />
-        <div>
-          <button onClick={startRecording} disabled={isRecording}>
-            Iniciar grabación
-          </button>
-          <button onClick={switchCamera} disabled={!isRecording}>
-            Cambiar cámara
-          </button>
-          <button onClick={stopRecording} disabled={!isRecording}>
-            Detener grabación
-          </button>
-        </div>
-        {recordingUrl && (
-          <div>
-            <h3>URL de la grabación:</h3>
-            <a href={recordingUrl} download="grabacion.webm">
-              Descargar grabación
-            </a>
-          </div>
+        <Webcam audio={false} ref={webcamRef} videoConstraints={{ facingMode: "environment" }} />
+        {capturing ? (
+          <button onClick={handleStopCaptureClick}>Stop Capture</button>
+        ) : (
+          <button onClick={handleStartCaptureClick}>Start Capture</button>
         )}
-
-        {/* Descargar video */}
-        {recordingUrl && (
-          <div>
-            <video src={recordingUrl} controls></video>
-          </div>
+        {recordedChunks.length > 0 && (
+          <button onClick={handleDownload}>Download</button>
         )}
       </header>
     </div>
